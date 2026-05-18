@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Agent Dashboard</title>
+<style>
+:root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;--blu:#58a6ff;--grn:#3fb950;--org:#f0883e;--red:#f85149;--yel:#d29922;--pur:#bc8cff;--cyn:#39c5cf;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'SF Mono',Consolas,monospace;background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+/* header */
+header{background:var(--sur);border-bottom:1px solid var(--bdr);padding:9px 18px;display:flex;align-items:center;gap:14px;flex-shrink:0;}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--grn);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.aname{font-size:1.05em;font-weight:bold;color:var(--blu);}
+.hmeta{color:var(--mut);font-size:.78em;}
+.prog{display:flex;align-items:center;gap:6px;font-size:.78em;color:var(--mut);}
+.prog .pbar{width:120px;height:6px;background:#21262d;border-radius:99px;overflow:hidden;}
+.prog .pfill{height:6px;background:var(--grn);transition:width .6s;}
+.prog .pfill.near{background:var(--yel);}
+.prog .pfill.done{background:var(--blu);}
+.prog b{color:var(--grn);}
+.prog b.near{color:var(--yel);}
+.prog b.done{color:var(--blu);}
+/* layout */
+.grid{display:grid;grid-template-columns:200px 200px 240px 1fr;grid-template-rows:1fr auto;gap:10px;padding:10px;flex:1;min-height:0;}
+/* card */
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:11px;display:flex;flex-direction:column;overflow:hidden;}
+.ctitle{font-size:.63em;font-weight:bold;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px;flex-shrink:0;display:flex;justify-content:space-between;align-items:center;}
+.ctitle .cnt{background:#21262d;color:var(--mut);padding:1px 6px;border-radius:99px;font-size:.85em;}
+/* inventory */
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #21262d;font-size:.83em;}
+.rrow:last-child{border-bottom:none;}
+.rname{color:var(--txt);}
+.rname.g{color:var(--blu);}
+.rname.s{color:var(--cyn);}
+.rqty{font-weight:bold;color:var(--org);}
+.rqty.g{color:var(--grn);}
+.rqty.s{color:var(--cyn);}
+.rbadge{font-size:.62em;padding:1px 4px;background:#1f3a5f;color:var(--blu);border-radius:3px;margin-left:3px;}
+.rbadge.s{background:#1a3a3a;color:var(--cyn);}
+/* goals */
+.grow{margin-bottom:10px;}
+.grow:last-child{margin-bottom:0;}
+.glabel{display:flex;justify-content:space-between;font-size:.78em;margin-bottom:4px;}
+.gres{color:var(--blu);}
+.gcnt{color:var(--mut);}
+.gcnt b{color:var(--org);}
+.barbg{background:#21262d;border-radius:99px;height:7px;}
+.barfill{height:7px;border-radius:99px;transition:width .6s;background:var(--grn);}
+.barfill.done{background:var(--blu);}
+/* pending */
+.prow{padding:7px 9px;background:#21262d;border-radius:6px;margin-bottom:7px;font-size:.74em;cursor:pointer;transition:background .15s;border:1px solid transparent;}
+.prow:hover{background:#2a3038;border-color:var(--blu);}
+.prow:last-child{margin-bottom:0;}
+.peer{color:var(--blu);font-weight:bold;font-size:.92em;display:flex;justify-content:space-between;margin-bottom:4px;}
+.pkv{display:flex;gap:6px;line-height:1.4;}
+.pkv .pk{color:var(--mut);min-width:38px;flex-shrink:0;}
+.pkv .pv{color:var(--txt);}
+.pv .give{color:var(--org);}
+.pv .want{color:var(--grn);}
+.empty{color:var(--mut);font-size:.78em;font-style:italic;}
+/* feed */
+.feedcard{grid-column:4;grid-row:1;}
+.feed{flex:1;overflow-y:auto;min-height:0;}
+.feed::-webkit-scrollbar{width:3px;}
+.feed::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px;}
+.fi{padding:5px 8px;border-bottom:1px solid #21262d;font-size:.76em;line-height:1.45;display:flex;gap:6px;align-items:baseline;}
+.fi .ts{color:var(--mut);font-size:.82em;flex-shrink:0;width:55px;}
+.fi .tag{flex-shrink:0;padding:1px 5px;border-radius:3px;font-size:.7em;font-weight:bold;}
+.fi .body{flex:1;word-break:break-word;}
+.fi.ti{border-left:2px solid var(--blu);}
+.fi.ta{border-left:2px solid var(--grn);}
+.fi.tr{border-left:2px solid var(--red);}
+.fi.to{border-left:2px solid var(--yel);}
+.fi.td{border-left:2px solid var(--pur);}
+.fi.tp{border-left:2px solid var(--bdr);}
+.fi.ts2{border-left:2px solid var(--mut);}
+.fi.tc{border-left:2px solid var(--cyn);}
+.fi.tcl{border-left:2px solid var(--org);}
+.tag-i{background:#1f3a5f;color:var(--blu);}
+.tag-a{background:#1a3a2a;color:var(--grn);}
+.tag-r{background:#3a1a1a;color:var(--red);}
+.tag-o{background:#3a2a1a;color:var(--yel);}
+.tag-d{background:#2a1a3a;color:var(--pur);}
+.tag-p{background:#21262d;color:var(--mut);}
+.tag-s{background:#21262d;color:var(--mut);}
+.tag-c{background:#1a3a3a;color:var(--cyn);}
+.tag-cl{background:#3a2a1a;color:var(--org);}
+/* compose */
+.compcard{grid-column:1/-1;grid-row:2;}
+.compgrid{display:grid;grid-template-columns:185px 1fr auto;gap:9px;align-items:start;}
+.flabel{font-size:.68em;color:var(--mut);margin-bottom:3px;}
+select,textarea{width:100%;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:6px 9px;font-family:inherit;font-size:.8em;outline:none;}
+select:focus,textarea:focus{border-color:var(--blu);}
+textarea{resize:none;height:68px;}
+.bgrp{display:flex;flex-direction:column;gap:5px;padding-top:17px;}
+button{border:none;border-radius:6px;padding:6px 11px;cursor:pointer;font-family:inherit;font-size:.78em;font-weight:bold;transition:opacity .15s;}
+button:hover{opacity:.8;}
+.bp{background:#238636;color:#fff;}
+.bs{background:#21262d;color:var(--txt);border:1px solid var(--bdr);}
+/* conversation modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:100;}
+.modal.open{display:flex;}
+.mbox{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;width:min(620px,92vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+.mhead{padding:12px 16px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;}
+.mhead .mt{font-weight:bold;color:var(--blu);font-size:.95em;}
+.mhead .mc{color:var(--mut);font-size:.75em;}
+.mbody{flex:1;overflow-y:auto;padding:8px 16px;}
+.turn{padding:7px 0;border-bottom:1px solid #21262d;font-size:.82em;display:flex;gap:10px;align-items:baseline;}
+.turn:last-child{border-bottom:none;}
+.turn .who{flex-shrink:0;width:50px;font-weight:bold;font-size:.75em;text-transform:uppercase;letter-spacing:.5px;}
+.turn.peer .who{color:var(--blu);}
+.turn.self .who{color:var(--grn);}
+.turn .kbadge{flex-shrink:0;background:#21262d;color:var(--mut);font-size:.65em;padding:1px 5px;border-radius:3px;font-weight:bold;text-transform:uppercase;}
+.turn .txt{flex:1;color:var(--txt);word-break:break-word;}
+.turn .at{flex-shrink:0;color:var(--mut);font-size:.72em;}
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="dot"></div>
+  <span class="aname" id="hName">—</span>
+  <span class="hmeta">Puerto: <b id="hPort">—</b></span>
+  <span class="prog" id="hProg" title="Progress toward goal (PDF §3 — near victory)">
+    <span>Goal</span>
+    <div class="pbar"><div class="pfill" id="hProgFill" style="width:0%"></div></div>
+    <b id="hProgPct">0%</b>
+  </span>
+  <span class="hmeta" style="margin-left:auto">Butler: <span style="color:var(--blu)" id="hButler">—</span></span>
+  <span class="hmeta" id="hClock"></span>
+</header>
+
+<div class="grid">
+  <!-- Inventario -->
+  <div class="card">
+    <div class="ctitle">Inventario</div>
+    <div id="inv" style="overflow-y:auto;flex:1">Cargando…</div>
+  </div>
+
+  <!-- Objetivos -->
+  <div class="card">
+    <div class="ctitle">Objetivos</div>
+    <div id="goals" style="overflow-y:auto;flex:1">Cargando…</div>
+  </div>
+
+  <!-- Pending offers -->
+  <div class="card">
+    <div class="ctitle">
+      Ofertas Pendientes
+      <span class="cnt" id="pendCnt">0</span>
+    </div>
+    <div id="pend" style="overflow-y:auto;flex:1">
+      <div class="empty">Sin ofertas activas</div>
+    </div>
+  </div>
+
+  <!-- Feed -->
+  <div class="card feedcard">
+    <div class="ctitle">
+      Actividad en Tiempo Real
+      <button class="bs" onclick="clearFeed()" style="padding:2px 7px;font-size:.65em">✕</button>
+    </div>
+    <div class="feed" id="feed"></div>
+  </div>
+
+  <!-- Compose -->
+  <div class="card compcard">
+    <div class="ctitle">Enviar Mensaje Manual</div>
+    <div class="compgrid">
+      <div>
+        <div class="flabel">Destinatario</div>
+        <select id="agSel"><option value="">— seleccionar —</option></select>
+      </div>
+      <div>
+        <div class="flabel">Mensaje (texto libre o JSON)</div>
+        <textarea id="msgBox" placeholder='{"kind":"request","resources":{"vino":2},"offered_resources":{"oro":3}}'></textarea>
+      </div>
+      <div class="bgrp">
+        <button class="bp" onclick="sendMsg()">▶ Enviar</button>
+        <button class="bs" onclick="fillGoal()">🎯 Pedir objetivo</button>
+        <button class="bs" onclick="fillOffer()">📦 Ofrecer libres</button>
+        <button class="bs" onclick="openConv()">💬 Conversación</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Conversation modal -->
+<div class="modal" id="convModal" onclick="if(event.target===this)closeConv()">
+  <div class="mbox">
+    <div class="mhead">
+      <span class="mt" id="convTitle">Conversación</span>
+      <span class="mc"><span id="convCount">0</span> turnos · <button class="bs" onclick="closeConv()" style="padding:2px 7px;font-size:.7em">✕</button></span>
+    </div>
+    <div class="mbody" id="convBody">
+      <div class="empty">Sin historial</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let S = {inventory:{},goal_needs:{},initial_goal:{},target_resources:[],surplus:{},progress:0,near_victory:false};
+let AGENTS = [];
+let PENDING = [];
+const ANAME = '__AGENT_NAME__';
+document.getElementById('hName').textContent   = ANAME;
+document.getElementById('hPort').textContent   = '__MY_PORT__';
+document.getElementById('hButler').textContent = '__BUTLER_URL__';
+
+setInterval(()=>{ document.getElementById('hClock').textContent = new Date().toLocaleTimeString(); }, 1000);
+
+// ── Progress (PDF §3 near_victory) ──
+function renderProgress(s){
+  const pct = Math.round((s.progress||0)*100);
+  const fill = document.getElementById('hProgFill');
+  const lbl  = document.getElementById('hProgPct');
+  fill.style.width = pct+'%';
+  fill.classList.toggle('near', s.near_victory && pct<100);
+  fill.classList.toggle('done', pct>=100);
+  lbl.textContent = pct+'%' + (s.near_victory ? ' ⚡' : '');
+  lbl.classList.toggle('near', s.near_victory && pct<100);
+  lbl.classList.toggle('done', pct>=100);
+}
+
+// ── Inventory (with surplus markers) ──
+function renderInv(s){
+  const g = new Set(s.target_resources||[]);
+  const surplus = s.surplus||{};
+  const e = Object.entries(s.inventory||{}).sort((a,b)=>{
+    const ag=g.has(a[0]),bg=g.has(b[0]);
+    return ag!==bg ? (ag?-1:1) : b[1]-a[1];
+  });
+  document.getElementById('inv').innerHTML = e.length
+    ? e.map(([r,q])=>{
+        const isGoal = g.has(r);
+        const isSurplus = !isGoal && (surplus[r]||0) > 0;
+        const cls = isGoal ? 'g' : (isSurplus ? 's' : '');
+        const badge = isGoal ? '<span class="rbadge">🎯</span>' :
+                      isSurplus ? '<span class="rbadge s">↗</span>' : '';
+        return `<div class="rrow">
+          <span class="rname ${cls}">${r}${badge}</span>
+          <span class="rqty ${cls}">${q}</span>
+        </div>`;
+      }).join('')
+    : '<span class="empty">Vacío</span>';
+}
+
+function renderGoals(s){
+  const gn=s.goal_needs||{}, ig=s.initial_goal||{};
+  const all=[...new Set([...Object.keys(ig),...Object.keys(gn)])];
+  if(!all.length){
+    document.getElementById('goals').innerHTML='<div style="color:var(--grn);font-weight:bold">✓ ¡Todos completados!</div>';
+    return;
+  }
+  document.getElementById('goals').innerHTML=all.map(r=>{
+    const total=ig[r]||1, rem=gn[r]||0, recv=total-rem;
+    const pct=Math.round(recv/total*100);
+    return rem===0
+      ? `<div class="grow"><div class="glabel"><span class="gres">${r}</span><span style="color:var(--grn)">✓ listo</span></div>
+          <div class="barbg"><div class="barfill done" style="width:100%"></div></div></div>`
+      : `<div class="grow"><div class="glabel"><span class="gres">${r}</span>
+          <span class="gcnt">${recv}/${total} &nbsp;(<b>${rem}</b> faltan)</span></div>
+          <div class="barbg"><div class="barfill" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+}
+
+// ── Pending offers (PDF §5) ──
+function peerLabel(ip){
+  const a = AGENTS.find(x=>x.ip===ip);
+  return a ? `${a.alias}` : ip;
+}
+function renderPending(list){
+  PENDING = list || [];
+  const wrap = document.getElementById('pend');
+  document.getElementById('pendCnt').textContent = PENDING.length;
+  if(!PENDING.length){
+    wrap.innerHTML = '<div class="empty">Sin ofertas activas</div>';
+    return;
+  }
+  wrap.innerHTML = PENDING.map(p => {
+    const give = Object.entries(p.we_give||{}).map(([k,v])=>`${k}:${v}`).join(', ')||'—';
+    const want = Object.entries(p.we_want||{}).map(([k,v])=>`${k}:${v}`).join(', ')||'—';
+    const age = Math.max(0, Math.round((Date.now()/1000 - (p.created_at||0))));
+    return `<div class="prow" onclick="openConv('${p.peer}')" title="Click para ver conversación">
+      <div class="peer"><span>${peerLabel(p.peer)}</span><span style="color:var(--mut);font-weight:normal">${age}s</span></div>
+      <div class="pkv"><span class="pk">give</span><span class="pv give">${give}</span></div>
+      <div class="pkv"><span class="pk">want</span><span class="pv want">${want}</span></div>
+    </div>`;
+  }).join('');
+}
+
+async function pollPending(){
+  try{
+    PENDING = await(await fetch('/api/pending')).json() || [];
+    renderPending(PENDING);
+  }catch(_){ }
+}
+
+async function poll(){
+  try{
+    const r=await fetch('/api/state');
+    S=await r.json();
+    renderInv(S); renderGoals(S); renderProgress(S);
+  }catch(_){}
+}
+
+// ── Agents ──
+async function pollAgents(){
+  try{
+    AGENTS=await(await fetch('/api/agents')).json()||[];
+    const sel=document.getElementById('agSel'), cur=sel.value;
+    sel.innerHTML='<option value="">— seleccionar —</option>';
+    AGENTS.forEach(a=>{
+      if(a.alias===ANAME) return;
+      const o=document.createElement('option');
+      o.value=a.ip; o.textContent=`${a.alias} (${a.ip})`;
+      sel.appendChild(o);
+    });
+    if(cur) sel.value=cur;
+    renderPending(PENDING);  // re-render to refresh peer labels
+  }catch(_){}
+}
+
+// ── Conversation modal (PDF §7 step 1) ──
+async function openConv(peer){
+  // If no peer passed, default to the selected one in compose
+  if(!peer){ peer = document.getElementById('agSel').value; }
+  if(!peer){ alert('Selecciona un agente primero'); return; }
+  document.getElementById('convTitle').textContent = '💬 ' + peerLabel(peer);
+  document.getElementById('convBody').innerHTML = '<div class="empty">Cargando…</div>';
+  document.getElementById('convModal').classList.add('open');
+  try{
+    const r = await fetch('/api/conversation?peer=' + encodeURIComponent(peer));
+    const data = await r.json();
+    const turns = data[peer] || [];
+    document.getElementById('convCount').textContent = turns.length;
+    if(!turns.length){
+      document.getElementById('convBody').innerHTML = '<div class="empty">Sin historial</div>';
+      return;
+    }
+    document.getElementById('convBody').innerHTML = turns.map(t => {
+      const when = t.at ? new Date(t.at*1000).toLocaleTimeString() : '';
+      const kind = t.kind ? `<span class="kbadge">${t.kind}</span>` : '';
+      const who  = t.role === 'peer' ? 'PEER' : 'ME';
+      return `<div class="turn ${t.role}">
+        <span class="who">${who}</span>${kind}
+        <span class="txt">${escapeHtml(t.text||'')}</span>
+        <span class="at">${when}</span>
+      </div>`;
+    }).join('');
+  }catch(e){
+    document.getElementById('convBody').innerHTML = '<div class="empty">Error: '+e+'</div>';
+  }
+}
+function closeConv(){ document.getElementById('convModal').classList.remove('open'); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── Feed ──
+const TAGS={
+  inbox:    ['INBOX','tag-i','ti'],
+  accept:   ['ACCEPT','tag-a','ta'],
+  reject:   ['REJECT','tag-r','tr'],
+  offer:    ['OFFER','tag-o','to'],
+  counter:  ['COUNTER','tag-c','tc'],
+  clarify:  ['CLARIFY','tag-cl','tcl'],
+  delivery: ['DELIVERY','tag-d','td'],
+  proactive:['PROACTIVO','tag-p','tp'],
+  send:     ['OUT','tag-s','ts2'],
+  sync:     ['BUTLER','tag-d','td'],
+};
+function fmt(o){ return Object.entries(o||{}).map(([k,v])=>`${k}:${v}`).join(', ')||'{}'; }
+
+function addEv(ev){
+  const feed=document.getElementById('feed');
+  const [label,tcls,fcls]=TAGS[ev.kind]||['?','tag-s','ts2'];
+  let body='';
+  switch(ev.kind){
+    case 'inbox':    body=`<b>${ev.from_||'?'}</b>: ${(ev.text||'').substring(0,110)}`; break;
+    case 'accept':
+    case 'offer':    body=`→ <b>${ev.to||'?'}</b> | ${fmt(ev.resources)}`; break;
+    case 'reject':   body=`→ <b>${ev.to||'?'}</b>${ev.reason?' | '+ev.reason:''}`; break;
+    case 'counter':  body=`→ <b>${ev.to||'?'}</b> | ${fmt(ev.resources)}${ev.reason?' · '+ev.reason:''}`; break;
+    case 'clarify':  body=`→ <b>${ev.to||'?'}</b>${ev.reason?' · '+ev.reason:''}`; break;
+    case 'delivery': body=`← <b>${ev.from_||'?'}</b> | ${fmt(ev.resources)}`; break;
+    case 'proactive':body=`🎯 necesito ${fmt(ev.resources)} | ofrezco ${fmt(ev.offered)}`; break;
+    case 'send':     body=`→ <b>${ev.to}</b>: ${(ev.text||'').substring(0,90)}`; break;
+    default:         body=JSON.stringify(ev).substring(0,100);
+  }
+  const d=document.createElement('div');
+  d.className=`fi ${fcls}`;
+  d.innerHTML=`<span class="ts">${ev.ts||''}</span><span class="tag ${tcls}">${label}</span><span class="body">${body}</span>`;
+  feed.insertBefore(d,feed.firstChild);
+  while(feed.children.length>200) feed.removeChild(feed.lastChild);
+
+  // Any decisive event may have created/cleared a pending offer — refresh
+  if(['accept','offer','counter','reject','delivery','proactive'].includes(ev.kind)){
+    pollPending();
+  }
+}
+function clearFeed(){ document.getElementById('feed').innerHTML=''; }
+
+// ── SSE ──
+const es=new EventSource('/api/stream');
+es.onmessage=e=>{ try{ addEv(JSON.parse(e.data)); }catch(_){} };
+es.onopen=()=>{ document.getElementById('dot').style.background='var(--grn)'; };
+es.onerror=()=>{ document.getElementById('dot').style.background='var(--red)'; };
+
+// ── Manual send ──
+async function sendMsg(){
+  const ip=document.getElementById('agSel').value;
+  const msg=document.getElementById('msgBox').value.trim();
+  if(!ip){ alert('Selecciona un agente'); return; }
+  if(!msg){ alert('Escribe un mensaje'); return; }
+  const r=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip,message:msg})});
+  const res=await r.json();
+  if(res.status==='ok'){
+    addEv({kind:'send',ts:new Date().toLocaleTimeString(),to:ip,text:msg.substring(0,90)});
+    document.getElementById('msgBox').value='';
+  } else alert('Error: '+(res.message||JSON.stringify(res)));
+}
+
+function fillGoal(){
+  const gn=S.goal_needs||{}, surplus=S.surplus||{};
+  // Per PDF: offered_resources should be drawn from surplus, not full inventory
+  document.getElementById('msgBox').value=JSON.stringify({kind:'request',from_agent:ANAME,resources:gn,offered_resources:surplus},null,2);
+}
+function fillOffer(){
+  const surplus=S.surplus||{};
+  document.getElementById('msgBox').value=JSON.stringify({kind:'delivery',from_agent:ANAME,resources:surplus},null,2);
+}
+
+// Keyboard: Esc closes modal
+window.addEventListener('keydown', e => { if(e.key==='Escape') closeConv(); });
+
+// ── Boot ──
+fetch('/api/events').then(r=>r.json()).then(evs=>evs.slice(-80).forEach(addEv)).catch(()=>{});
+poll(); pollAgents(); pollPending();
+setInterval(poll,3000);
+setInterval(pollAgents,20000);
+setInterval(pollPending,5000);
+</script>
+</body>
+</html>
