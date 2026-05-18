@@ -1,247 +1,269 @@
 # fdi-dasi-jackson
 
-## Team
+## Equipo
 
 * Zhaoyang Qi
 * Jingyuan Wang
 
 ---
 
-## What this project does
+## Qué hace este proyecto
 
-An autonomous resource-trading agent that competes with other agents in a multi-agent
-barter game, coordinated through a central **Butler** server. The agent registers,
-loads its inventory and victory goal from Butler, and then engages in continuous
-negotiation with peers — broadcasting needs, evaluating incoming offers, countering
-when terms aren't acceptable, and chaining intermediate trades to reach the goal
-faster.
+Un agente autónomo de intercambio de recursos que compite con otros agentes en un
+juego multi-agente de trueque, coordinado a través de un servidor central al que
+en este código llamamos **Butler**. "Butler" es el **rol** del coordinador
+central definido por el protocolo del curso (registro, inventario/objetivo,
+lista de pares y entregas de paquetes); la instancia concreta la provee el
+profesor en la URL que indique. El agente se registra, carga su inventario y
+su objetivo de victoria desde ese servidor y, a partir de ahí, mantiene una
+negociación continua con sus pares: difunde sus necesidades, evalúa las
+ofertas entrantes, contraoferta cuando los términos no son aceptables y
+encadena intercambios intermedios para alcanzar el objetivo más rápido.
 
-**Architecture in one line:** the LLM (Ollama, via function-calling tools) suggests
-intent classification and strategy; code enforces every constraint and executes
-all state transitions.
-
----
-
-## Prerequisites
-
-- [`uv`](https://github.com/astral-sh/uv) — Python package manager
-- [`ollama`](https://ollama.com) — local LLM runtime
-- An Ollama model with **tool-calling** support (we use `llama3.1` by default;
-  `qwen2.5:7b-instruct` is a faster alternative)
+**Arquitectura en una frase:** el LLM (Ollama, mediante herramientas de
+function-calling) sugiere la clasificación de intención y la estrategia; el
+código aplica todas las restricciones y ejecuta todas las transiciones de
+estado.
 
 ---
 
-## Setup
+## Requisitos previos
+
+- [`uv`](https://github.com/astral-sh/uv) — gestor de paquetes de Python
+- [`ollama`](https://ollama.com) — runtime local de LLM
+- Un modelo de Ollama con soporte de **tool-calling** (usamos `llama3.1` por
+  defecto; `qwen2.5:7b-instruct` es una alternativa más rápida)
+
+---
+
+## Instalación
 
 ```bash
-# 1. Install Python deps
+# 1. Instalar dependencias de Python
 uv sync --extra dev
 
-# 2. Pull the LLM model (one-time)
+# 2. Descargar el modelo del LLM (una sola vez)
 ollama pull llama3.1
 ```
 
 ---
 
-## Running
+## Ejecución
+
+El servidor central lo provee el profesor. Antes de arrancar, ajusta
+`SERVER_URL` a la URL que indique (ver tabla de configuración más abajo) y
+lanza el agente:
 
 ```bash
-# Start the Butler server (provided separately — fdi-pln-butler)
-fdi-pln-butler
-
-# Start one agent
 uv run main.py
 ```
 
-For multi-agent local testing on the same host, give each agent a unique port
-and alias:
-
-```bash
-MY_PORT=7720 AGENT_NAME=AgentA uv run main.py
-MY_PORT=7721 AGENT_NAME=AgentB uv run main.py
-```
-
-For two-machine setups, ensure each agent points `SERVER_URL` at the LAN IP of
-the Butler host (not `127.0.0.1`), so Butler records each agent under its
-reachable address.
+En el entorno de evaluación, cada agente corre en su propia máquina, por lo
+que todos pueden usar el puerto por defecto (`7720`) sin colisiones.
 
 ---
 
-## Configuration
+## Configuración
 
-All values are environment-variable-overridable. Most useful ones:
+Todos los valores se pueden sobrescribir mediante variables de entorno. Las
+más útiles:
 
-| Variable            | Default                       | Description                                         |
-|---------------------|-------------------------------|-----------------------------------------------------|
-| `SERVER_URL`        | `http://192.168.1.153:7719/`  | Butler base URL — set to Butler host's LAN IP       |
-| `AGENT_NAME`        | `FC1111129`                   | Alias registered with Butler                        |
-| `MY_PORT`           | `7720`                        | Port this agent listens on for `/buzon`             |
-| `OLLAMA_MODEL`      | `llama3.1`                    | Ollama model name (must support tool calling)       |
-| `OLLAMA_URL`        | `http://localhost:11434`      | Ollama server URL                                   |
-| `OLLAMA_TIMEOUT`    | `30.0`                        | Seconds before giving up on an Ollama call          |
-| `HTTP_TIMEOUT`      | `60.0`                        | Seconds for agent-to-agent HTTP                     |
-| `BUTLER_TIMEOUT`    | `5.0`                         | Seconds for Butler startup calls                    |
-| `PENDING_OFFER_TTL` | `300.0`                       | Seconds until an unanswered offer is auto-cancelled |
-| `CHAIN_RESERVE_TTL` | `180.0`                       | Seconds an unfulfilled chain-trade plan is held     |
-| `LOCAL_TEST_MODE`   | `false`                       | Skip Butler registration (mock data)                |
-
----
-
-## Module layout
-
-```
-main.py                FastAPI app, lifespan, /buzon endpoint, dashboard routes
-agents.py              Agent-to-agent HTTP client (concurrent broadcast)
-butler.py              Butler HTTP client (register, info, peer list, deliveries)
-config.py              Centralised env-var configuration
-decision_engine.py     Core business logic: process_request, counter, accept, chain
-events.py              In-memory pub/sub for dashboard /api/stream
-message_normalizer.py  JSON / NL → NormalizedMessage (regex fast path + Ollama)
-messaging.py           Outbound structured-message builders
-models.py              Pydantic schemas (NormalizedMessage, ChainPlan, etc.)
-ollama_client.py       Async Ollama chat client with function-calling tools
-prompt_builder.py      All Ollama prompts and tool schemas
-state_manager.py       Async-safe state: inventory, goals, pendings, chain plans
-utils.py               Shared helpers (resource whitelist, JSON parsing)
-dashboard.html         Embedded SPA served at /dashboard
-```
+| Variable            | Valor por defecto             | Descripción                                                                       |
+|---------------------|-------------------------------|-----------------------------------------------------------------------------------|
+| `SERVER_URL`        | definido en `config.py`       | URL del servidor central indicada por el profesor                                 |
+| `AGENT_NAME`        | definido en `config.py`       | Alias con el que se registra en el servidor central                               |
+| `MY_PORT`           | `7720`                        | Puerto en el que este agente escucha `/buzon`                                     |
+| `OLLAMA_MODEL`      | `llama3.1`                    | Nombre del modelo de Ollama (debe admitir tool-calling)                           |
+| `OLLAMA_URL`        | `http://localhost:11434`      | URL del servidor de Ollama                                                        |
+| `OLLAMA_TIMEOUT`    | `30.0`                        | Segundos antes de abandonar una llamada a Ollama                                  |
+| `HTTP_TIMEOUT`      | `60.0`                        | Segundos para las llamadas HTTP entre agentes                                     |
+| `BUTLER_TIMEOUT`    | `5.0`                         | Segundos para las llamadas de arranque al servidor central                        |
+| `PENDING_OFFER_TTL` | `300.0`                       | Segundos antes de auto-cancelar una oferta sin respuesta                          |
+| `CHAIN_RESERVE_TTL` | `180.0`                       | Segundos que se mantiene un plan de cadena sin completar                          |
 
 ---
 
-## Decision pipeline
+## Protocolo con el servidor central
+
+El agente sólo invoca **4 endpoints** sobre `SERVER_URL`. Cualquier servidor
+que implemente este contrato (el del profesor o un Butler local) sirve como
+coordinador:
+
+| Método | Ruta                  | Uso                                                                 |
+|--------|-----------------------|---------------------------------------------------------------------|
+| `POST` | `/alias/{AGENT_NAME}` | Registrar al agente con el alias indicado                           |
+| `GET`  | `/info`               | Obtener el inventario y el objetivo asignados a este agente         |
+| `GET`  | `/gente`              | Listar pares activos (`[{alias, ip}, ...]`)                         |
+| `POST` | `/paquete/{alias}`    | Entregar un paquete de recursos al par `alias`; cuerpo: `{recurso: cantidad}` |
+
+Si la URL del profesor responde a estas 4 rutas con el formato esperado, no
+hace falta ningún cambio en el código del agente — basta con ajustar
+`SERVER_URL`.
+
+---
+
+## Estructura de módulos
+
+```
+main.py                Aplicación FastAPI, lifespan, endpoint /buzon, rutas del dashboard
+agents.py              Cliente HTTP agente-a-agente (broadcast concurrente)
+butler.py              Cliente HTTP de Butler (registro, info, lista de pares, entregas)
+config.py              Configuración centralizada vía variables de entorno
+decision_engine.py     Lógica de negocio central: process_request, counter, accept, chain
+events.py              Pub/sub en memoria para el /api/stream del dashboard
+message_normalizer.py  JSON / lenguaje natural → NormalizedMessage (regex rápida + Ollama)
+messaging.py           Constructores de mensajes estructurados salientes
+models.py              Esquemas Pydantic (NormalizedMessage, ChainPlan, etc.)
+ollama_client.py       Cliente asíncrono del chat de Ollama con function-calling
+prompt_builder.py      Todos los prompts y esquemas de herramientas de Ollama
+state_manager.py       Estado seguro para async: inventario, objetivos, pendings, planes de cadena
+utils.py               Helpers compartidos (whitelist de recursos, parseo de JSON)
+dashboard.html         SPA embebida servida en /dashboard
+```
+
+---
+
+## Pipeline de decisión
 
 ```
 HTTP POST /buzon
    │
-   │   (1) instant ack — return {"status": "queued"} in <50ms
+   │   (1) ack inmediato — devuelve {"status": "queued"} en <50 ms
    ▼
 asyncio.create_task(_handle_inbox)
    │
-   ▼ (background)
+   ▼ (en segundo plano)
 message_normalizer.normalize()
-   ├─ JSON parse short-circuit
-   ├─ Regex fast path:    "Necesito X. Puedo ofrecer Y."        → request
-   │                      "Te ofrezco X a cambio de Y."          → counter_offer
-   │                      "Te envío X."                          → delivery
-   │                      "¿Puedes enviarme X, como acordamos?"  → request (honour claim)
-   │                      "ok" / "vale" / "sí" …                 → accept / clarification
-   └─ Fallback: Ollama `classify_intent` tool
+   ├─ Atajo de parseo JSON
+   ├─ Camino rápido por regex:
+   │     "Necesito X. Puedo ofrecer Y."        → request
+   │     "Te ofrezco X a cambio de Y."          → counter_offer
+   │     "Te envío X."                          → delivery
+   │     "¿Puedes enviarme X, como acordamos?"  → request (reclamación de honor)
+   │     "ok" / "vale" / "sí" …                 → accept / clarification
+   └─ Fallback: herramienta `classify_intent` de Ollama
    ▼
 NormalizedMessage { kind, resources, offered_resources, ... }
    │
    ├── request        → decision_engine.process_request()
-   │     0. Honour-pending fast path: if the peer simply claims what we
-   │        already promised, settle it now and skip the LLM entirely
-   │     1. Snapshot state (inventory, goal_needs, surplus, chain_opportunities)
-   │     2. Split forbidden vs exchangeable (target-resource protection,
-   │        intermediate-reservation aware)
-   │     3. Early-reject branches each TRY A COUNTER FIRST (see below)
-   │     4. Otherwise run Ollama `evaluate_trade` tool
-   │     5. Validate every field of the LLM output; rule-based fallback on fail
-   │     6. Execute decision atomically; trigger chain second leg if applicable
+   │     0. Camino rápido honour-pending: si el par sólo está reclamando
+   │        lo que ya prometimos, se liquida ahora y se omite el LLM
+   │     1. Snapshot del estado (inventory, goal_needs, surplus, chain_opportunities)
+   │     2. Separar prohibidos vs intercambiables (protección de recursos objetivo,
+   │        teniendo en cuenta reservas intermedias)
+   │     3. Las ramas de rechazo temprano INTENTAN PRIMERO UNA CONTRAOFERTA (ver abajo)
+   │     4. Si no, se ejecuta la herramienta `evaluate_trade` de Ollama
+   │     5. Se valida cada campo de la salida del LLM; fallback a reglas si falla
+   │     6. Se ejecuta la decisión atómicamente; se dispara la segunda
+   │        pierna de la cadena si aplica
    │
-   ├── counter_offer → process_counter_offer()  runs the request flow, then may
-   │                   generate a tighter re-counter via the Ollama counter tool
-   ├── accept    → process_accept()      honour pending, deliver, request goal back
-   ├── delivery  → process_delivery()    add to inventory, update goal_needs
-   ├── clarify   → process_clarification() send a Spanish question
-   └── reject    → release chain reservation, clear pending, mark response
+   ├── counter_offer → process_counter_offer()  ejecuta el flujo de request y,
+   │                   si procede, genera una recontraoferta más ajustada con
+   │                   la herramienta de counter de Ollama
+   ├── accept    → process_accept()      honra el pending, entrega, solicita el objetivo de vuelta
+   ├── delivery  → process_delivery()    suma al inventario, actualiza goal_needs
+   ├── clarify   → process_clarification() envía una pregunta en español
+   └── reject    → libera la reserva de cadena, limpia el pending, marca la respuesta
 ```
 
 ---
 
-## Counter-before-reject
+## Contraoferta antes del rechazo
 
-A peer's request never falls through to a silent reject without first attempting
-a counter-offer. `_counter_request_if_valuable` picks one of three strategies:
+Una solicitud de un par nunca termina en un rechazo silencioso sin antes
+intentar una contraoferta. `_counter_request_if_valuable` elige una de tres
+estrategias:
 
-| Strategy        | When                                                    | Shape                                          |
-|-----------------|---------------------------------------------------------|------------------------------------------------|
-| **concrete**    | Peer's offer already includes a goal resource           | Match their offered qty, give full surplus     |
-| **chain**       | Peer's offer is an intermediate a known peer wants for a goal resource | Single surplus item × single intermediate, capped at 3 |
-| **speculative** | Peer's offer contains nothing useful                    | Single surplus × single goal_need, capped at 3 |
+| Estrategia        | Cuándo                                                                       | Forma                                                                |
+|-------------------|------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| **concrete**      | La oferta del par ya incluye un recurso del objetivo                         | Un único recurso de surplus, cantidad pequeña, tope 3                |
+| **chain**         | La oferta del par es un intermedio que otro par conocido quiere a cambio de un recurso objetivo | Un único item de surplus × un único intermedio, tope 3 |
+| **speculative**   | La oferta del par no contiene nada útil                                      | Un único surplus × un único goal_need, tope 3                        |
 
-If the same counter shape would repeat against the same peer, the reject-loop
-guard sweetens the next attempt: drop the largest `want` by 1 first, otherwise
-bump the smallest `give` by 1. Once both directions are exhausted, the counter
-is dropped and the conversation truly ends in reject.
-
----
-
-## Chain trades
-
-When a peer offers a non-goal resource that a third party would accept in
-exchange for a goal resource, the agent automatically:
-
-1. **Reserves** the incoming intermediate via `state.reserve_intermediate(plan)`
-   so other peers can't pull it from free surplus.
-2. **Fires** an immediate second-leg counter-offer to the third party.
-3. **Releases** the reservation when one of: deduct fulfils the plan, second-leg
-   is rejected, second-leg send fails, or `CHAIN_RESERVE_TTL` elapses.
-
-The reservation is subtracted from `surplus` and from `_split_exchangeable`'s
-inventory cap, so it cannot be accidentally traded away on another track.
+Si la misma forma de contraoferta se repitiera contra el mismo par, el guardia
+contra bucles de rechazo "endulza" el siguiente intento: primero baja en 1 el
+mayor `want`; si no, sube en 1 el menor `give`. Cuando ambas direcciones se
+agotan, se descarta la contraoferta y la conversación termina realmente en
+reject.
 
 ---
 
-## Proactive broadcast
+## Intercambios en cadena (chain trades)
 
-Every 45 s the agent broadcasts its current needs and surplus:
+Cuando un par ofrece un recurso que no es del objetivo pero un tercero lo
+aceptaría a cambio de un recurso objetivo, el agente automáticamente:
+
+1. **Reserva** el intermedio entrante con `state.reserve_intermediate(plan)`
+   para que otros pares no puedan llevárselo del surplus libre.
+2. **Dispara** de inmediato una contraoferta de segunda pierna al tercero.
+3. **Libera** la reserva cuando ocurra una de estas: el deduct completa el
+   plan, el segundo tramo es rechazado, el envío del segundo tramo falla, o
+   transcurre `CHAIN_RESERVE_TTL`.
+
+La reserva se resta de `surplus` y del tope de inventario de
+`_split_exchangeable`, de modo que no se puede negociar accidentalmente en
+otra vía.
+
+---
+
+## Broadcast proactivo
+
+Cada 45 s el agente difunde sus necesidades y su surplus actuales:
 
 ```
 Necesito 3 queso, 5 aceite. Puedo ofrecer 1 queso, 3 tela, 3 aceite, 16 oro.
 ```
 
-Peers with a "fresh" pending offer (younger than `PENDING_OFFER_TTL / 2`) are
-skipped that cycle, so a single peer isn't spammed with the same shape.
+Los pares con una oferta pendiente "fresca" (más joven que
+`PENDING_OFFER_TTL / 2`) se saltan en ese ciclo, para no spamear al mismo par
+con la misma forma.
 
-Broadcasts go out **concurrently** (`asyncio.gather`) so one unreachable peer
-doesn't block the rest. Pending bookkeeping is recorded only for peers whose
-delivery actually succeeded.
+Los broadcasts salen **concurrentemente** (`asyncio.gather`) para que un par
+inalcanzable no bloquee a los demás. La contabilidad de pendings se registra
+sólo para los pares cuya entrega realmente tuvo éxito.
 
 ---
 
 ## Dashboard
 
-Open `http://localhost:7720/dashboard` after starting the agent. Single-page UI
-with:
+Abre `http://localhost:7720/dashboard` después de iniciar el agente. SPA con:
 
-- **Inventory & Goal panels** — live counts with progress bars
-- **Pending offers** — what we currently owe to whom
-- **Conversation modal per peer** — full turn-by-turn history
-- **Event feed (SSE)** — real-time stream of inbox / decision / delivery /
-  pending_expired / chain_expired / error events
-- **Manual send box** — send a one-off message to any peer
+- **Paneles de inventario y objetivo** — contadores en vivo con barras de progreso
+- **Ofertas pendientes** — qué debemos en este momento y a quién
+- **Modal de conversación por par** — historial completo turno a turno
+- **Feed de eventos (SSE)** — flujo en tiempo real de eventos inbox /
+  decision / delivery / pending_expired / chain_expired / error
+- **Caja de envío manual** — enviar un mensaje puntual a cualquier par
 
 ---
 
-## API endpoints
+## Endpoints de la API
 
-| Method | Path                | Purpose                                         |
-|--------|---------------------|-------------------------------------------------|
-| `POST` | `/buzon`            | Receive a message (ack only — async processing) |
-| `GET`  | `/dashboard`        | SPA dashboard                                   |
-| `GET`  | `/api/state`        | Inventory, goals, surplus, progress snapshot    |
-| `GET`  | `/api/agents`       | Active peer list (proxied from Butler)          |
-| `GET`  | `/api/events`       | Recent dashboard events (buffer)                |
-| `GET`  | `/api/stream`       | Server-Sent Events stream of live events        |
-| `GET`  | `/api/pending`      | All outstanding offers                          |
-| `GET`  | `/api/conversation` | Full per-peer history (`?peer=<ip>` to filter)  |
-| `POST` | `/api/send`         | Manually send a message to a peer               |
-| `GET`  | `/state`            | Same as `/api/state` (legacy alias)             |
+| Método | Ruta                | Propósito                                                      |
+|--------|---------------------|----------------------------------------------------------------|
+| `POST` | `/buzon`            | Recibe un mensaje (sólo ack — procesamiento asíncrono)         |
+| `GET`  | `/dashboard`        | SPA del dashboard                                              |
+| `GET`  | `/api/state`        | Snapshot de inventario, objetivos, surplus y progreso          |
+| `GET`  | `/api/agents`       | Lista de pares activos (proxy desde Butler)                    |
+| `GET`  | `/api/events`       | Eventos recientes del dashboard (buffer)                       |
+| `GET`  | `/api/stream`       | Flujo Server-Sent Events de eventos en vivo                    |
+| `GET`  | `/api/pending`      | Todas las ofertas pendientes                                   |
+| `GET`  | `/api/conversation` | Historial completo por par (`?peer=<ip>` para filtrar)         |
+| `POST` | `/api/send`         | Enviar manualmente un mensaje a un par                         |
+| `GET`  | `/state`            | Igual que `/api/state` (alias heredado)                        |
 
-### `/buzon` payload
+### Carga útil de `/buzon`
 
 ```json
-{ "msg": "<JSON string or Spanish natural-language text>" }
+{ "msg": "<cadena JSON o texto en español en lenguaje natural>" }
 ```
 
-The agent ack's with `{"status": "queued"}` immediately and processes in
-the background. All decisions, counters, and resource deliveries flow back
-out through separate channels (peer-to-peer `/buzon` calls + Butler
-`paquete` deliveries).
+El agente responde con `{"status": "queued"}` de inmediato y procesa en
+segundo plano. Todas las decisiones, contraofertas y entregas de recursos
+vuelven a salir por canales separados (llamadas peer-to-peer a `/buzon` +
+entregas `paquete` de Butler).
 
-### Recognised JSON inbound
+### JSON de entrada reconocido
 
 ```json
 {
@@ -252,77 +274,83 @@ out through separate channels (peer-to-peer `/buzon` calls + Butler
 }
 ```
 
-### Recognised natural-language formats (fast-path regex)
+### Formatos de lenguaje natural reconocidos (regex de camino rápido)
 
-| Format                                                  | Parsed as                       |
-|---------------------------------------------------------|---------------------------------|
-| `Necesito 3 queso, 5 aceite. Puedo ofrecer 4 tela.`      | `request`                       |
-| `Te ofrezco 3 arroz a cambio de 2 queso.`                | `counter_offer`                 |
-| `Puedo ofrecer 3 arroz a cambio de 2 queso.`             | `counter_offer`                 |
-| `Te doy 3 arroz a cambio de 2 queso.`                    | `counter_offer`                 |
-| `Te envío 2 piedras ahora.` / `Te mando 2 piedras.`      | `delivery`                      |
-| `¿Puedes enviarme 2 piedra, como acordamos?`             | `request` (honour claim)        |
-| `ok` / `vale` / `sí` / `acepto` / `trato` …              | `accept` if pending, else `clarification` |
+| Formato                                                  | Se interpreta como                       |
+|----------------------------------------------------------|------------------------------------------|
+| `Necesito 3 queso, 5 aceite. Puedo ofrecer 4 tela.`      | `request`                                |
+| `Te ofrezco 3 arroz a cambio de 2 queso.`                | `counter_offer`                          |
+| `Puedo ofrecer 3 arroz a cambio de 2 queso.`             | `counter_offer`                          |
+| `Te doy 3 arroz a cambio de 2 queso.`                    | `counter_offer`                          |
+| `Te envío 2 piedras ahora.` / `Te mando 2 piedras.`      | `delivery`                               |
+| `¿Puedes enviarme 2 piedra, como acordamos?`             | `request` (reclamación de honor)         |
+| `ok` / `vale` / `sí` / `acepto` / `trato` …              | `accept` si hay pending, si no `clarification` |
 
-The **honour claim** format is the exact sentence the agent itself emits to
-collect on an already-agreed trade (`decision_engine._generate_trade_message`,
-want-only branch). Parsing it deterministically here — rather than relying on
-the LLM — guarantees the second leg of a barter routes to `process_request`'s
-honour-pending fast path and the trade closes cleanly. A bare-affirmation
-("ok") is only an `accept` when an offer to that peer is actually pending;
-otherwise it is treated as `clarification`.
+El formato de **reclamación de honor** es exactamente la frase que el propio
+agente emite para cobrar un trato ya acordado
+(`decision_engine._generate_trade_message`, rama want-only). Parsearlo de
+forma determinista aquí — en vez de depender del LLM — garantiza que la
+segunda pierna del trueque entre por el camino rápido honour-pending de
+`process_request` y que el trato cierre limpiamente. Una afirmación escueta
+("ok") sólo se considera `accept` cuando hay efectivamente una oferta
+pendiente hacia ese par; en caso contrario se trata como `clarification`.
 
-Anything else falls through to the Ollama `classify_intent` tool. If Ollama
-is unreachable or returns `unknown`, the message is conservatively re-classified
-as `clarification` so the peer is asked for clarification instead of being
-silently ignored.
-
----
-
-## State invariants enforced by code (not by LLM)
-
-- **Goal-reserved resources** are never traded below the still-needed quantity.
-- **Resource whitelist** is enforced in tool schemas via JSON Schema
-  `propertyNames: { enum: [...] }`, so the LLM cannot invent resources.
-- **Chain reservations** are subtracted from `surplus` and from
-  `exchangeable` caps — no double-spending.
-- **Inventory** never goes negative (atomic deduct under `asyncio.Lock`).
-- **Pending offers** that fail to send at the HTTP layer are never recorded;
-  the reject-loop guard sees only shapes that actually went out.
-- **Reject responses from peers** flip the corresponding `peer_response` to
-  `"rejected"` and release chain reservations tied to that pending offer.
+Cualquier otra cosa cae en la herramienta `classify_intent` de Ollama. Si
+Ollama no está accesible o devuelve `unknown`, el mensaje se reclasifica
+conservadoramente como `clarification`, de modo que se pida una aclaración
+al par en lugar de ignorarlo silenciosamente.
 
 ---
 
-## Troubleshooting
+## Invariantes de estado garantizadas por código (no por el LLM)
 
-### `ConnectTimeout` to a peer's IP
+- Los **recursos reservados al objetivo** nunca se intercambian por debajo de
+  la cantidad aún necesaria.
+- La **whitelist de recursos** se aplica en los esquemas de las herramientas
+  mediante JSON Schema `propertyNames: { enum: [...] }`, de modo que el LLM
+  no puede inventar recursos.
+- Las **reservas de cadena** se restan de `surplus` y de los topes de
+  `exchangeable` — no hay doble gasto.
+- El **inventario** nunca queda negativo (deduct atómico bajo `asyncio.Lock`).
+- Las **ofertas pendientes** que fallan al enviarse por HTTP no se registran;
+  el guardia contra bucles de rechazo sólo ve formas que realmente salieron.
+- Las **respuestas de rechazo de los pares** ponen el `peer_response`
+  correspondiente en `"rejected"` y liberan las reservas de cadena ligadas a
+  esa oferta pendiente.
 
-Peer's machine is dropping packets (firewall) or that IP is stale in Butler:
+---
+
+## Resolución de problemas
+
+### `ConnectTimeout` hacia la IP de un par
+
+La máquina del par está descartando paquetes (firewall) o esa IP está
+obsoleta en Butler:
 
 ```bash
-ping <ip>           # L3 reachability
-nc -zv <ip> 7720    # L4 reachability
+ping <ip>           # alcance en L3
+nc -zv <ip> 7720    # alcance en L4
 ```
 
-- `ping` works, `nc` times out → firewall on the peer (Windows Defender, UFW)
-- Both fail → wrong subnet / VMware NAT / AP isolation
-- `nc` returns `Connection refused` → peer's agent isn't running
+- `ping` responde, `nc` agota tiempo → firewall en el par (Windows Defender, UFW)
+- Fallan ambos → subred incorrecta / NAT de VMware / aislamiento del AP
+- `nc` devuelve `Connection refused` → el agente del par no está corriendo
 
-### `Ollama returned no tool call` warnings
+### Avisos `Ollama returned no tool call`
 
-The model occasionally fails to emit a tool call. The fast-path regex now
-covers ~80% of standard messages so this is rarer; for the rest the agent
-falls back to a clarification request. Switching to `qwen2.5:7b-instruct`
-gives more consistent tool-calling than `llama3.1`.
+El modelo a veces no emite una llamada de herramienta. La regex de camino
+rápido ahora cubre ~80 % de los mensajes estándar, así que esto es más raro;
+para el resto, el agente cae en una solicitud de clarificación. Cambiar a
+`qwen2.5:7b-instruct` da un tool-calling más consistente que `llama3.1`.
 
-### `ReadTimeout` on outbound sends
+### `ReadTimeout` en envíos salientes
 
-The peer's `/buzon` is slow to respond. Should be uncommon now that `/buzon`
-ack's in <50 ms; if you still see it, the peer is running an old synchronous
-version of `/buzon`. They should also be on the latest code.
+El `/buzon` del par tarda en responder. Debería ser poco frecuente ahora que
+`/buzon` hace ack en <50 ms; si aún lo ves, el par está ejecutando una
+versión síncrona antigua de `/buzon`. Deberían actualizarse al código más
+reciente.
 
-### Same peer's IP keeps showing in Butler after they restarted
+### La misma IP de un par sigue apareciendo en Butler después de reiniciar
 
-Butler persists registrations in `estado_butler.json`. Stop Butler, delete
-the file, restart — peers will re-register cleanly.
+Butler persiste los registros en `estado_butler.json`. Detén Butler, borra
+el archivo y reinícialo — los pares se volverán a registrar limpiamente.
